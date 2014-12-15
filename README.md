@@ -1,4 +1,4 @@
 meteor-algolia
 ==============
 
-Package to handle Algolia API (client and server)
+Package to handle the blazing fast Algolia search egnine (client and server).
