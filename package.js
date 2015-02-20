@@ -1,7 +1,7 @@
 Package.describe({
   name: 'acemtp:algolia',
   summary: 'Package to handle the blazing fast Algolia search egnine (client and server)',
-  version: '1.7.0',
+  version: '1.7.5',
   git: 'https://github.com/acemtp/meteor-algolia.git'
 });
 
@@ -14,5 +14,5 @@ Package.onUse(function(api) {
 });
 
 Npm.depends({
-  'algolia-search': '1.7.0'
+  'algolia-search': '1.7.5'
 });

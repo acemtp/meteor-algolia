@@ -21,7 +21,7 @@
  * THE SOFTWARE.
  */
 
- ALGOLIA_VERSION = '2.8.1';
+var ALGOLIA_VERSION = '2.9.2';
 
 /*
  * Copyright (c) 2013 Algolia
@@ -57,7 +57,7 @@
  *        - dsn (optional) set to true if your account has the Distributed Search Option
  *        - dsnHost (optional) override the automatic computation of dsn hostname
  */
- AlgoliaSearch = function(applicationID, apiKey, methodOrOptions, resolveDNS, hosts) {
+var AlgoliaSearch = function(applicationID, apiKey, methodOrOptions, resolveDNS, hosts) {
     var self = this;
     this.applicationID = applicationID;
     this.apiKey = apiKey;
@@ -68,6 +68,10 @@
     this.requestTimeoutInMs = 2000;
     this.extraHeaders = [];
     this.jsonp = null;
+    this.options = {};
+
+    // make sure every client instance has it's own cache
+    this.cache = {};
 
     var method;
     var tld = 'net';
@@ -76,6 +80,7 @@
     } else {
         // Take all option from the hash
         var options = methodOrOptions || {};
+        this.options = options;
         if (!this._isUndefined(options.method)) {
             method = options.method;
         }
@@ -130,6 +135,13 @@
         } else {
             this.hosts.unshift(this.host_protocol + this.applicationID + '-dsn.algolia.' + tld);
         }
+    }
+    // angular dependencies injection
+    if (this.options.angular) {
+        this.options.angular.$injector.invoke(['$http', '$q', function ($http, $q) {
+            self.options.angular.$q = $q;
+            self.options.angular.$http = $http;
+        }]);
     }
 };
 
@@ -219,7 +231,7 @@ AlgoliaSearch.prototype = {
      *  content: the server answer that contains the task ID
      */
     deleteIndex: function(indexName, callback) {
-        this._jsonRequest({ method: 'DELETE',
+        return this._jsonRequest({ method: 'DELETE',
                             url: '/1/indexes/' + encodeURIComponent(indexName),
                             callback: callback });
     },
@@ -233,7 +245,7 @@ AlgoliaSearch.prototype = {
      */
     moveIndex: function(srcIndexName, dstIndexName, callback) {
         var postObj = {operation: 'move', destination: dstIndexName};
-        this._jsonRequest({ method: 'POST',
+        return this._jsonRequest({ method: 'POST',
                             url: '/1/indexes/' + encodeURIComponent(srcIndexName) + '/operation',
                             body: postObj,
                             callback: callback });
@@ -249,7 +261,7 @@ AlgoliaSearch.prototype = {
      */
     copyIndex: function(srcIndexName, dstIndexName, callback) {
         var postObj = {operation: 'copy', destination: dstIndexName};
-        this._jsonRequest({ method: 'POST',
+        return this._jsonRequest({ method: 'POST',
                             url: '/1/indexes/' + encodeURIComponent(srcIndexName) + '/operation',
                             body: postObj,
                             callback: callback });
@@ -270,7 +282,7 @@ AlgoliaSearch.prototype = {
             length = 10;
         }
 
-        this._jsonRequest({ method: 'GET',
+        return this._jsonRequest({ method: 'GET',
                             url: '/1/logs?offset=' + offset + '&length=' + length,
                             callback: callback });
     },
@@ -283,8 +295,8 @@ AlgoliaSearch.prototype = {
      * @param page The page to retrieve, starting at 0.
      */
     listIndexes: function(callback, page) {
-        var params = page ? '?page=' + page : '';
-        this._jsonRequest({ method: 'GET',
+        var params = typeof page !== 'undefined' ? '?page=' + page : '';
+        return this._jsonRequest({ method: 'GET',
                             url: '/1/indexes' + params,
                             callback: callback });
     },
@@ -306,7 +318,7 @@ AlgoliaSearch.prototype = {
      *  content: the server answer with user keys list or error description if success is false.
      */
     listUserKeys: function(callback) {
-        this._jsonRequest({ method: 'GET',
+        return this._jsonRequest({ method: 'GET',
                             url: '/1/keys',
                             callback: callback });
     },
@@ -318,7 +330,7 @@ AlgoliaSearch.prototype = {
      *  content: the server answer with user keys list or error description if success is false.
      */
     getUserKeyACL: function(key, callback) {
-        this._jsonRequest({ method: 'GET',
+        return this._jsonRequest({ method: 'GET',
                             url: '/1/keys/' + key,
                             callback: callback });
     },
@@ -330,7 +342,7 @@ AlgoliaSearch.prototype = {
      *  content: the server answer with user keys list or error description if success is false.
      */
     deleteUserKey: function(key, callback) {
-        this._jsonRequest({ method: 'DELETE',
+        return this._jsonRequest({ method: 'DELETE',
                             url: '/1/keys/' + key,
                             callback: callback });
     },
@@ -352,7 +364,7 @@ AlgoliaSearch.prototype = {
     addUserKey: function(acls, callback) {
         var aclsObject = {};
         aclsObject.acl = acls;
-        this._jsonRequest({ method: 'POST',
+        return this._jsonRequest({ method: 'POST',
                             url: '/1/keys',
                             body: aclsObject,
                             callback: callback });
@@ -382,7 +394,7 @@ AlgoliaSearch.prototype = {
         aclsObject.validity = validity;
         aclsObject.maxQueriesPerIPPerHour = maxQueriesPerIPPerHour;
         aclsObject.maxHitsPerQuery = maxHitsPerQuery;
-        this._jsonRequest({ method: 'POST',
+        return this._jsonRequest({ method: 'POST',
                             url: '/1/indexes/' + indexObj.indexName + '/keys',
                             body: aclsObject,
                             callback: callback });
@@ -465,13 +477,7 @@ AlgoliaSearch.prototype = {
      */
     sendQueriesBatch: function(callback, delay) {
         var as = this;
-        var params = {requests: [], apiKey: this.apiKey, appID: this.applicationID};
-        if (this.userToken) {
-            params['X-Algolia-UserToken'] = this.userToken;
-        }
-        if (this.tagFilters) {
-            params['X-Algolia-TagFilters'] = this.tagFilters;
-        }
+        var params = {requests: []};
         for (var i = 0; i < as.batch.length; ++i) {
             params.requests.push(as.batch[i]);
         }
@@ -482,7 +488,7 @@ AlgoliaSearch.prototype = {
             }, delay);
             as.onDelayTrigger = onDelayTrigger;
         } else {
-            this._sendQueriesBatch(params, callback);
+            return this._sendQueriesBatch(params, callback);
         }
     },
 
@@ -507,6 +513,9 @@ AlgoliaSearch.prototype = {
         this.as = algoliasearch;
         this.typeAheadArgs = null;
         this.typeAheadValueOption = null;
+
+        // make sure every index instance has it's own cache
+        this.cache = {};
     },
    /**
      * Add an extra field to the HTTP request
@@ -519,9 +528,10 @@ AlgoliaSearch.prototype = {
     },
 
     _sendQueriesBatch: function(params, callback) {
-        if (this.jsonp === null) {
+
+       if (this.jsonp === null) {
             var self = this;
-            this._jsonRequest({ cache: this.cache,
+            return this._jsonRequest({ cache: this.cache,
                 method: 'POST',
                 url: '/1/indexes/*/queries',
                 body: params,
@@ -542,63 +552,73 @@ AlgoliaSearch.prototype = {
                 var q = '/1/indexes/' + encodeURIComponent(params.requests[i].indexName) + '?' + params.requests[i].params;
                 jsonpParams += i + '=' + encodeURIComponent(q) + '&';
             }
-            this._jsonRequest({ cache: this.cache,
+            var pObj = {params: jsonpParams};
+            return this._jsonRequest({ cache: this.cache,
                                    method: 'GET',
                                    url: '/1/indexes/*',
-                                   body: { params: jsonpParams },
+                                   body: pObj,
                                    callback: callback });
         } else {
-            this._jsonRequest({ cache: this.cache,
+            return this._jsonRequest({ cache: this.cache,
                                    method: 'POST',
                                    url: '/1/indexes/*/queries',
                                    body: params,
-       	                           callback: callback});
+                                          callback: callback});
         }
     },
     /*
      * Wrapper that try all hosts to maximize the quality of service
      */
     _jsonRequest: function(opts) {
-        var successiveRetryCount = 0;
         var self = this;
         var callback = opts.callback;
         var cache = null;
         var cacheID = opts.url;
+        var deferred = null;
+        if (this.options.jQuery) {
+            deferred = this.options.jQuery.$.Deferred();
+            deferred.promise = deferred.promise(); // promise is a property in angular
+        } else if (this.options.angular) {
+            deferred = this.options.angular.$q.defer();
+        }
+
         if (!this._isUndefined(opts.body)) {
             cacheID = opts.url + '_body_' + JSON.stringify(opts.body);
         }
         if (!this._isUndefined(opts.cache)) {
             cache = opts.cache;
             if (!this._isUndefined(cache[cacheID])) {
-                if (!this._isUndefined(callback)) {
+                if (!this._isUndefined(callback) && callback) {
                     setTimeout(function () { callback(true, cache[cacheID]); }, 1);
                 }
-                return;
+                deferred && deferred.resolve(cache[cacheID]);
+                return deferred && deferred.promise;
             }
         }
 
+        opts.successiveRetryCount = 0;
         var impl = function() {
-            if (successiveRetryCount >= self.hosts.length) {
-                if (!self._isUndefined(callback)) {
-                    successiveRetryCount = 0;
-                    callback(false, { message: 'Cannot connect the Algolia\'s Search API. Please send an email to support@algolia.com to report the issue.' });
+            if (opts.successiveRetryCount >= self.hosts.length) {
+                var error = { message: 'Cannot connect the Algolia\'s Search API. Please send an email to support@algolia.com to report the issue.' };
+                if (!self._isUndefined(callback) && callback) {
+                    opts.successiveRetryCount = 0;
+                    callback(false, error);
                 }
+                deferred && deferred.reject(error);
                 return;
             }
-            opts.callback = function(retry, success, res, body) {
-                if (!success && !self._isUndefined(body)) {
-                    window.console && console.log('Error: ' + body.message);
-                }
+            opts.callback = function(retry, success, obj, body) {
                 if (success && !self._isUndefined(opts.cache)) {
                     cache[cacheID] = body;
                 }
                 if (!success && retry) {
                     self.currentHostIndex = ++self.currentHostIndex % self.hosts.length;
-                    successiveRetryCount += 1;
+                    opts.successiveRetryCount += 1;
                     impl();
                 } else {
-                    successiveRetryCount = 0;
-                    if (!self._isUndefined(callback)) {
+                    opts.successiveRetryCount = 0;
+                    deferred && (success ? deferred.resolve(body) : deferred.reject(body));
+                    if (!self._isUndefined(callback) && callback) {
                         callback(success, body);
                     }
                 }
@@ -607,6 +627,8 @@ AlgoliaSearch.prototype = {
             self._jsonRequestByHost(opts);
         };
         impl();
+
+        return deferred && deferred.promise;
     },
 
     _jsonRequestByHost: function(opts) {
@@ -615,9 +637,104 @@ AlgoliaSearch.prototype = {
 
         if (this.jsonp) {
             this._makeJsonpRequestByHost(url, opts);
+        } else if (this.options.jQuery) {
+            this._makejQueryRequestByHost(url, opts);
+        } else if (this.options.angular) {
+            this._makeAngularRequestByHost(url, opts);
         } else {
             this._makeXmlHttpRequestByHost(url, opts);
         }
+    },
+
+    /**
+     * Make a $http
+     *
+     * @param url request url (includes endpoint and path)
+     * @param opts all request opts
+     */
+    _makeAngularRequestByHost: function(url, opts) {
+        var self = this;
+        var body = null;
+
+        if (!this._isUndefined(opts.body)) {
+            body = JSON.stringify(opts.body);
+        }
+
+        url += ((url.indexOf('?') === -1) ? '?' : '&') + 'X-Algolia-API-Key=' + this.apiKey;
+        url += '&X-Algolia-Application-Id=' + this.applicationID;
+        if (this.userToken) {
+            url += '&X-Algolia-UserToken=' + encodeURIComponent(this.userToken);
+        }
+        if (this.tagFilters) {
+            url += '&X-Algolia-TagFilters=' + encodeURIComponent(this.tagFilters);
+        }
+        for (var i = 0; i < this.extraHeaders.length; ++i) {
+            url += '&' + this.extraHeaders[i].key + '=' + this.extraHeaders[i].value;
+        }
+        this.options.angular.$http({
+            url: url,
+            method: opts.method,
+            data: body,
+            cache: false,
+            timeout: (this.requestTimeoutInMs * (opts.successiveRetryCount + 1))
+        }).then(function(response) {
+            opts.callback(false, true, null, response.data);
+        }, function(response) {
+            if (response.status === 0) {
+                // xhr.timeout is not handled by Angular.js right now
+                // let's retry
+                opts.callback(true, false, null, response.data);
+            } else if (response.status == 400 || response.status === 403 || response.status === 404) {
+                opts.callback(false, false, null, response.data);
+            } else {
+                opts.callback(true, false, null, response.data);
+            }
+        });
+    },
+
+    /**
+     * Make a $.ajax
+     *
+     * @param url request url (includes endpoint and path)
+     * @param opts all request opts
+     */
+    _makejQueryRequestByHost: function(url, opts) {
+        var self = this;
+        var body = null;
+
+        if (!this._isUndefined(opts.body)) {
+            body = JSON.stringify(opts.body);
+        }
+
+        url += ((url.indexOf('?') === -1) ? '?' : '&') + 'X-Algolia-API-Key=' + this.apiKey;
+        url += '&X-Algolia-Application-Id=' + this.applicationID;
+        if (this.userToken) {
+            url += '&X-Algolia-UserToken=' + encodeURIComponent(this.userToken);
+        }
+        if (this.tagFilters) {
+            url += '&X-Algolia-TagFilters=' + encodeURIComponent(this.tagFilters);
+        }
+        for (var i = 0; i < this.extraHeaders.length; ++i) {
+            url += '&' + this.extraHeaders[i].key + '=' + this.extraHeaders[i].value;
+        }
+        this.options.jQuery.$.ajax(url, {
+            type: opts.method,
+            timeout: (this.requestTimeoutInMs * (opts.successiveRetryCount + 1)),
+            dataType: 'json',
+            data: body,
+            error: function(xhr, textStatus, error) {
+                if (textStatus === 'timeout') {
+                    opts.callback(true, false, null, { 'message': 'Timeout - Could not connect to endpoint ' + url } );
+                } else if (xhr.status === 400 || xhr.status === 403 || xhr.status === 404) {
+                    opts.callback(false, false, null, xhr.responseJSON );
+                } else {
+                    opts.callback(true, false, null, { 'message': error } );
+                }
+            },
+            success: function(data, textStatus, xhr) {
+                opts.callback(false, true, null, data);
+            }
+        });
     },
 
     /**
@@ -646,15 +763,19 @@ AlgoliaSearch.prototype = {
         };
 
         script.type = 'text/javascript';
-        script.src = url + '?callback=' + cb + ',' + this.applicationID + ',' + this.apiKey;
+        script.src = url + '?callback=' + cb + '&X-Algolia-Application-Id=' + this.applicationID + '&X-Algolia-API-Key=' + this.apiKey;
 
-        if (opts.body['X-Algolia-TagFilters']) {
-            script.src += '&X-Algolia-TagFilters=' + encodeURIComponent(opts.body['X-Algolia-TagFilters']);
+        if (this.tagFilters) {
+            script.src += '&X-Algolia-TagFilters=' + encodeURIComponent(this.tagFilters);
         }
 
-        if (opts.body['X-Algolia-UserToken']) {
-            script.src += '&X-Algolia-UserToken=' + encodeURIComponent(opts.body['X-Algolia-UserToken']);
+        if (this.userToken) {
+            script.src += '&X-Algolia-UserToken=' + encodeURIComponent(this.userToken);
         }
+        for (var i = 0; i < this.extraHeaders.length; ++i) {
+            script.src += '&' + this.extraHeaders[i].key + '=' + this.extraHeaders[i].value;
+        }
+
 
         if (opts.body && opts.body.params) {
             script.src += '&' + opts.body.params;
@@ -720,18 +841,23 @@ AlgoliaSearch.prototype = {
             body = JSON.stringify(opts.body);
         }
 
+        url += ((url.indexOf('?') === -1) ? '?' : '&') + 'X-Algolia-API-Key=' + this.apiKey;
+        url += '&X-Algolia-Application-Id=' + this.applicationID;
+        if (this.userToken) {
+            url += '&X-Algolia-UserToken=' + encodeURIComponent(this.userToken);
+        }
+        if (this.tagFilters) {
+            url += '&X-Algolia-TagFilters=' + encodeURIComponent(this.tagFilters);
+        }
+        for (var i = 0; i < this.extraHeaders.length; ++i) {
+            url += '&' + this.extraHeaders[i].key + '=' + this.extraHeaders[i].value;
+        }
         if ('withCredentials' in xmlHttp) {
-            xmlHttp.open(opts.method, url , true);
-            if (this._isUndefined(opts.removeCustomHTTPHeaders) || !opts.removeCustomHTTPHeaders) {
-                      xmlHttp.setRequestHeader('X-Algolia-API-Key', this.apiKey);
-                      xmlHttp.setRequestHeader('X-Algolia-Application-Id', this.applicationID);
-            }
-            xmlHttp.timeout = this.requestTimeoutInMs;
-            for (var i = 0; i < this.extraHeaders.length; ++i) {
-                xmlHttp.setRequestHeader(this.extraHeaders[i].key, this.extraHeaders[i].value);
-            }
+            xmlHttp.open(opts.method, url, true);
+            xmlHttp.timeout = this.requestTimeoutInMs * (opts.successiveRetryCount + 1);
             if (body !== null) {
-                xmlHttp.setRequestHeader('Content-type', 'application/json');
+                /* This content type is specified to follow CORS 'simple header' directive */
+                xmlHttp.setRequestHeader('Content-type', 'application/x-www-form-urlencoded');
             }
         } else if (typeof XDomainRequest !== 'undefined') {
             // Handle IE8/IE9
@@ -756,14 +882,13 @@ AlgoliaSearch.prototype = {
             clearTimeout(ontimeout);
             ontimeout = null;
 
-        }, this.requestTimeoutInMs);
+        }, this.requestTimeoutInMs * (opts.successiveRetryCount + 1));
 
         xmlHttp.onload = function(event) {
             clearTimeout(ontimeout);
             ontimeout = null;
 
             if (!self._isUndefined(event) && event.target !== null) {
-                var retry = (event.target.status === 0 || event.target.status === 503);
                 var success = false;
                 var response = null;
 
@@ -771,12 +896,12 @@ AlgoliaSearch.prototype = {
                     // Handle CORS requests IE8/IE9
                     response = event.target.responseText;
                     success = (response && response.length > 0);
-                }
-                else {
+                } else {
                     response = event.target.response;
                     success = (event.target.status === 200 || event.target.status === 201);
                 }
 
+                var retry = !success && event.target.status !== 400 && event.target.status !== 403 && event.target.status !== 404;
                 opts.callback(retry, success, event.target, response ? JSON.parse(response) : null);
             } else {
                 opts.callback(false, true, event, JSON.parse(xmlHttp.responseText));
@@ -818,7 +943,6 @@ AlgoliaSearch.prototype = {
     tagFilters: null,
     userToken: null,
     hosts: [],
-    cache: {},
     extraHeaders: []
 };
 
@@ -846,12 +970,12 @@ AlgoliaSearch.prototype.Index.prototype = {
         addObject: function(content, callback, objectID) {
             var indexObj = this;
             if (this.as._isUndefined(objectID)) {
-                this.as._jsonRequest({ method: 'POST',
+                return this.as._jsonRequest({ method: 'POST',
                                        url: '/1/indexes/' + encodeURIComponent(indexObj.indexName),
                                        body: content,
                                        callback: callback });
             } else {
-                this.as._jsonRequest({ method: 'PUT',
+                return this.as._jsonRequest({ method: 'PUT',
                                        url: '/1/indexes/' + encodeURIComponent(indexObj.indexName) + '/' + encodeURIComponent(objectID),
                                        body: content,
                                        callback: callback });
@@ -874,7 +998,7 @@ AlgoliaSearch.prototype.Index.prototype = {
                                 body: objects[i] };
                 postObj.requests.push(request);
             }
-            this.as._jsonRequest({ method: 'POST',
+            return this.as._jsonRequest({ method: 'POST',
                                    url: '/1/indexes/' + encodeURIComponent(indexObj.indexName) + '/batch',
                                    body: postObj,
                                    callback: callback });
@@ -889,6 +1013,10 @@ AlgoliaSearch.prototype.Index.prototype = {
          * @param attributes (optional) if set, contains the array of attribute names to retrieve
          */
         getObject: function(objectID, callback, attributes) {
+            if (Object.prototype.toString.call(callback) === '[object Array]' && !attributes) {
+                attributes = callback;
+                callback = null;
+            }
             var indexObj = this;
             var params = '';
             if (!this.as._isUndefined(attributes)) {
@@ -900,9 +1028,17 @@ AlgoliaSearch.prototype.Index.prototype = {
                     params += attributes[i];
                 }
             }
-            this.as._jsonRequest({ method: 'GET',
-                                   url: '/1/indexes/' + encodeURIComponent(indexObj.indexName) + '/' + encodeURIComponent(objectID) + params,
-                                   callback: callback });
+            if (this.as.jsonp === null) {
+                return this.as._jsonRequest({ method: 'GET',
+                                       url: '/1/indexes/' + encodeURIComponent(indexObj.indexName) + '/' + encodeURIComponent(objectID) + params,
+                                       callback: callback });
+            } else {
+                var pObj = {params: params};
+                return this.as._jsonRequest({ method: 'GET',
+                                       url: '/1/indexes/' + encodeURIComponent(indexObj.indexName) + '/' + encodeURIComponent(objectID),
+                                       callback: callback,
+                                       body: pObj});
+            }
         },
 
         /*
@@ -916,7 +1052,7 @@ AlgoliaSearch.prototype.Index.prototype = {
          */
         partialUpdateObject: function(partialObject, callback) {
             var indexObj = this;
-            this.as._jsonRequest({ method: 'POST',
+            return this.as._jsonRequest({ method: 'POST',
                                    url: '/1/indexes/' + encodeURIComponent(indexObj.indexName) + '/' + encodeURIComponent(partialObject.objectID) + '/partial',
                                    body: partialObject,
                                    callback:  callback });
@@ -938,7 +1074,7 @@ AlgoliaSearch.prototype.Index.prototype = {
                                 body: objects[i] };
                 postObj.requests.push(request);
             }
-            this.as._jsonRequest({ method: 'POST',
+            return this.as._jsonRequest({ method: 'POST',
                                    url: '/1/indexes/' + encodeURIComponent(indexObj.indexName) + '/batch',
                                    body: postObj,
                                    callback: callback });
@@ -953,7 +1089,7 @@ AlgoliaSearch.prototype.Index.prototype = {
          */
         saveObject: function(object, callback) {
             var indexObj = this;
-            this.as._jsonRequest({ method: 'PUT',
+            return this.as._jsonRequest({ method: 'PUT',
                                    url: '/1/indexes/' + encodeURIComponent(indexObj.indexName) + '/' + encodeURIComponent(object.objectID),
                                    body: object,
                                    callback: callback });
@@ -975,7 +1111,7 @@ AlgoliaSearch.prototype.Index.prototype = {
                                 body: objects[i] };
                 postObj.requests.push(request);
             }
-            this.as._jsonRequest({ method: 'POST',
+            return this.as._jsonRequest({ method: 'POST',
                                    url: '/1/indexes/' + encodeURIComponent(indexObj.indexName) + '/batch',
                                    body: postObj,
                                    callback: callback });
@@ -994,7 +1130,7 @@ AlgoliaSearch.prototype.Index.prototype = {
                 return;
             }
             var indexObj = this;
-            this.as._jsonRequest({ method: 'DELETE',
+            return this.as._jsonRequest({ method: 'DELETE',
                                    url: '/1/indexes/' + encodeURIComponent(indexObj.indexName) + '/' + encodeURIComponent(objectID),
                                    callback: callback });
         },
@@ -1067,6 +1203,21 @@ AlgoliaSearch.prototype.Index.prototype = {
          * @param delay (optional) if set, wait for this delay (in ms) and only send the query if there was no other in the meantime.
          */
         search: function(query, callback, args, delay) {
+            if (query === undefined || query === null) {
+                query = '';
+            }
+
+            // no query = getAllObjects
+            if (typeof query === 'function') {
+                callback = query;
+                query = '';
+            }
+
+            if (typeof callback === 'object' && (this.as._isUndefined(args) || !args)) {
+                args = callback;
+                callback = null;
+            }
+
             var indexObj = this;
             var params = 'query=' + encodeURIComponent(query);
             if (!this.as._isUndefined(args) && args !== null) {
@@ -1079,7 +1230,7 @@ AlgoliaSearch.prototype.Index.prototype = {
                 }, delay);
                 indexObj.onDelayTrigger = onDelayTrigger;
             } else {
-                this._search(params, callback);
+                return this._search(params, callback);
             }
         },
 
@@ -1091,12 +1242,16 @@ AlgoliaSearch.prototype.Index.prototype = {
          * @param hitsPerPage: Pagination parameter used to select the number of hits per page. Defaults to 1000.
          */
         browse: function(page, callback, hitsPerPage) {
+            if (+callback > 0 && (this.as._isUndefined(hitsPerPage) || !hitsPerPage)) {
+                hitsPerPage = callback;
+                callback = null;
+            }
             var indexObj = this;
             var params = '?page=' + page;
             if (!this.as._isUndefined(hitsPerPage)) {
                 params += '&hitsPerPage=' + hitsPerPage;
             }
-            this.as._jsonRequest({ method: 'GET',
+            return this.as._jsonRequest({ method: 'GET',
                                    url: '/1/indexes/' + encodeURIComponent(indexObj.indexName) + '/browse' + params,
                                    callback: callback });
         },
@@ -1127,7 +1282,7 @@ AlgoliaSearch.prototype.Index.prototype = {
          */
         waitTask: function(taskID, callback) {
             var indexObj = this;
-            this.as._jsonRequest({ method: 'GET',
+            return this.as._jsonRequest({ method: 'GET',
                                    url: '/1/indexes/' + encodeURIComponent(indexObj.indexName) + '/task/' + taskID,
                                    callback: function(success, body) {
                 if (success) {
@@ -1151,7 +1306,7 @@ AlgoliaSearch.prototype.Index.prototype = {
          */
         clearIndex: function(callback) {
             var indexObj = this;
-            this.as._jsonRequest({ method: 'POST',
+            return this.as._jsonRequest({ method: 'POST',
                                    url: '/1/indexes/' + encodeURIComponent(indexObj.indexName) + '/clear',
                                    callback: callback });
         },
@@ -1164,7 +1319,7 @@ AlgoliaSearch.prototype.Index.prototype = {
          */
         getSettings: function(callback) {
             var indexObj = this;
-            this.as._jsonRequest({ method: 'GET',
+            return this.as._jsonRequest({ method: 'GET',
                                    url: '/1/indexes/' + encodeURIComponent(indexObj.indexName) + '/settings',
                                    callback: callback });
         },
@@ -1225,7 +1380,7 @@ AlgoliaSearch.prototype.Index.prototype = {
          */
         setSettings: function(settings, callback) {
             var indexObj = this;
-            this.as._jsonRequest({ method: 'PUT',
+            return this.as._jsonRequest({ method: 'PUT',
                                    url: '/1/indexes/' + encodeURIComponent(indexObj.indexName) + '/settings',
                                    body: settings,
                                    callback: callback });
@@ -1239,7 +1394,7 @@ AlgoliaSearch.prototype.Index.prototype = {
          */
         listUserKeys: function(callback) {
             var indexObj = this;
-            this.as._jsonRequest({ method: 'GET',
+            return this.as._jsonRequest({ method: 'GET',
                                    url: '/1/indexes/' + encodeURIComponent(indexObj.indexName) + '/keys',
                                    callback: callback });
         },
@@ -1252,7 +1407,7 @@ AlgoliaSearch.prototype.Index.prototype = {
          */
         getUserKeyACL: function(key, callback) {
             var indexObj = this;
-            this.as._jsonRequest({ method: 'GET',
+            return this.as._jsonRequest({ method: 'GET',
                                    url: '/1/indexes/' + encodeURIComponent(indexObj.indexName) + '/keys/' + key,
                                    callback: callback });
         },
@@ -1265,7 +1420,7 @@ AlgoliaSearch.prototype.Index.prototype = {
          */
         deleteUserKey: function(key, callback) {
             var indexObj = this;
-            this.as._jsonRequest({ method: 'DELETE',
+            return this.as._jsonRequest({ method: 'DELETE',
                                    url: '/1/indexes/' + encodeURIComponent(indexObj.indexName) + '/keys/' + key,
                                    callback: callback });
         },
@@ -1288,7 +1443,7 @@ AlgoliaSearch.prototype.Index.prototype = {
             var indexObj = this;
             var aclsObject = {};
             aclsObject.acl = acls;
-            this.as._jsonRequest({ method: 'POST',
+            return this.as._jsonRequest({ method: 'POST',
                                    url: '/1/indexes/' + encodeURIComponent(indexObj.indexName) + '/keys',
                                    body: aclsObject,
                                    callback: callback });
@@ -1318,7 +1473,7 @@ AlgoliaSearch.prototype.Index.prototype = {
             aclsObject.validity = validity;
             aclsObject.maxQueriesPerIPPerHour = maxQueriesPerIPPerHour;
             aclsObject.maxHitsPerQuery = maxHitsPerQuery;
-            this.as._jsonRequest({ method: 'POST',
+            return this.as._jsonRequest({ method: 'POST',
                                    url: '/1/indexes/' + encodeURIComponent(indexObj.indexName) + '/keys',
                                    body: aclsObject,
                                    callback: callback });
@@ -1327,16 +1482,10 @@ AlgoliaSearch.prototype.Index.prototype = {
         /// Internal methods only after this line
         ///
         _search: function(params, callback) {
-            var pObj = {params: params, apiKey: this.as.apiKey, appID: this.as.applicationID};
-            if (this.as.tagFilters) {
-                pObj['X-Algolia-TagFilters'] = this.as.tagFilters;
-            }
-            if (this.as.userToken) {
-                pObj['X-Algolia-UserToken'] = this.as.userToken;
-            }
+            var pObj = {params: params};
             if (this.as.jsonp === null) {
                 var self = this;
-                this.as._jsonRequest({ cache: this.cache,
+                return this.as._jsonRequest({ cache: this.cache,
                     method: 'POST',
                     url: '/1/indexes/' + encodeURIComponent(this.indexName) + '/query',
                     body: pObj,
@@ -1352,13 +1501,13 @@ AlgoliaSearch.prototype.Index.prototype = {
                     }
                 });
             } else if (this.as.jsonp) {
-                this.as._jsonRequest({ cache: this.cache,
+                return this.as._jsonRequest({ cache: this.cache,
                                        method: 'GET',
                                        url: '/1/indexes/' + encodeURIComponent(this.indexName),
                                        body: pObj,
                                        callback: callback });
             } else {
-                this.as._jsonRequest({ cache: this.cache,
+                return this.as._jsonRequest({ cache: this.cache,
                                        method: 'POST',
                                        url: '/1/indexes/' + encodeURIComponent(this.indexName) + '/query',
                                        body: pObj,
@@ -1369,10 +1518,8 @@ AlgoliaSearch.prototype.Index.prototype = {
         // internal attributes
         as: null,
         indexName: null,
-        cache: {},
         typeAheadArgs: null,
-        typeAheadValueOption: null,
-        emptyConstructor: function() {}
+        typeAheadValueOption: null
 };
 
 /*
@@ -1413,19 +1560,20 @@ AlgoliaSearch.prototype.Index.prototype = {
     }
     return out;
   };
-
+  
   /**
    * Algolia Search Helper providing faceting and disjunctive faceting
    * @param {AlgoliaSearch} client an AlgoliaSearch client
    * @param {string} index the index name to query
-   * @param {hash} options an associative array defining the hitsPerPage, list of facets and list of disjunctive facets
+   * @param {hash} options an associative array defining the hitsPerPage, list of facets, the list of disjunctive facets and the default facet filters
    */
   window.AlgoliaSearchHelper = function(client, index, options) {
     /// Default options
     var defaults = {
       facets: [],            // list of facets to compute
       disjunctiveFacets: [], // list of disjunctive facets to compute
-      hitsPerPage: 20        // number of hits per page
+      hitsPerPage: 20,       // number of hits per page
+      defaultFacetFilters: [] // the default list of facetFilters
     };
 
     this.init(client, index, extend({}, defaults, options));
@@ -1445,6 +1593,7 @@ AlgoliaSearch.prototype.Index.prototype = {
       this.options = options;
       this.page = 0;
       this.refinements = {};
+      this.excludes = {};
       this.disjunctiveRefinements = {};
       this.extraQueries = [];
     },
@@ -1465,7 +1614,7 @@ AlgoliaSearch.prototype.Index.prototype = {
       this.disjunctiveRefinements = this.disjunctiveRefinements || {};
       this._search();
     },
-
+    
     /**
      * Remove all refinements (disjunctive + conjunctive)
      */
@@ -1523,6 +1672,47 @@ AlgoliaSearch.prototype.Index.prototype = {
     },
 
     /**
+     * Ensure a facet exclude exists
+     * @param  {string} facet the facet to refine
+     * @param  {string} value the associated value
+     */
+    addExclude: function(facet, value) {
+      var refinement = facet + ':-' + value;
+      this.excludes = this.excludes || {};
+      this.excludes[refinement] = true;
+    },
+
+    /**
+     * Ensure a facet exclude does not exist
+     * @param  {string} facet the facet to refine
+     * @param  {string} value the associated value
+     */
+    removeExclude: function(facet, value) {
+      var refinement = facet + ':-' + value;
+      this.excludes = this.excludes || {};
+      this.excludes[refinement] = false;
+    },
+
+    /**
+     * Toggle refinement state of an exclude
+     * @param  {string} facet the facet to refine
+     * @param  {string} value the associated value
+     * @return {boolean} true if the facet has been found
+     */
+    toggleExclude: function(facet, value) {
+      for (var i = 0; i < this.options.facets.length; ++i) {
+        if (this.options.facets[i] == facet) {
+          var refinement = facet + ':-' + value;
+          this.excludes[refinement] = !this.excludes[refinement];
+          this.page = 0;
+          this._search();
+          return true;
+        }
+      }
+      return false;
+    },
+
+    /**
      * Toggle refinement state of a facet
      * @param  {string} facet the facet to refine
      * @param  {string} value the associated value
@@ -1562,6 +1752,20 @@ AlgoliaSearch.prototype.Index.prototype = {
         return true;
       }
       if (this.disjunctiveRefinements[facet] && this.disjunctiveRefinements[facet][value]) {
+        return true;
+      }
+      return false;
+    },
+
+    /**
+     * Check the exclude state of a facet
+     * @param  {string}  facet the facet
+     * @param  {string}  value the associated value
+     * @return {boolean} true if refined
+     */
+    isExcluded: function(facet, value) {
+      var refinement = facet + ':-' + value;
+      if (this.excludes[refinement]) {
         return true;
       }
       return false;
@@ -1647,10 +1851,21 @@ AlgoliaSearch.prototype.Index.prototype = {
     _search: function() {
       this.client.startQueriesBatch();
       this.client.addQueryInBatch(this.index, this.q, this._getHitsSearchParams());
-      for (var i = 0; i < this.options.disjunctiveFacets.length; ++i) {
-        this.client.addQueryInBatch(this.index, this.q, this._getDisjunctiveFacetSearchParams(this.options.disjunctiveFacets[i]));
+      var disjunctiveFacets = [];
+      var unusedDisjunctiveFacets = {};
+      var i = 0;
+      for (i = 0; i < this.options.disjunctiveFacets.length; ++i) {
+        var facet = this.options.disjunctiveFacets[i];
+        if (this._hasDisjunctiveRefinements(facet)) {
+          disjunctiveFacets.push(facet);
+        } else {
+          unusedDisjunctiveFacets[facet] = true;
+        }
       }
-      for (var i = 0; i < this.extraQueries.length; ++i) {
+      for (i = 0; i < disjunctiveFacets.length; ++i) {
+        this.client.addQueryInBatch(this.index, this.q, this._getDisjunctiveFacetSearchParams(disjunctiveFacets[i]));
+      }
+      for (i = 0; i < this.extraQueries.length; ++i) {
         this.client.addQueryInBatch(this.extraQueries[i].index, this.extraQueries[i].query, this.extraQueries[i].params);
       }
       var self = this;
@@ -1660,29 +1875,57 @@ AlgoliaSearch.prototype.Index.prototype = {
           return;
         }
         var aggregatedAnswer = content.results[0];
-        aggregatedAnswer.disjunctiveFacets = {};
-        aggregatedAnswer.facetStats = {};
-        for (var i = 0; i < self.options.disjunctiveFacets.length; ++i) {
-          for (var facet in content.results[i + 1].facets) {
-            aggregatedAnswer.disjunctiveFacets[facet] = content.results[i + 1].facets[facet];
-            if (self.disjunctiveRefinements[facet]) {
-              for (var value in self.disjunctiveRefinements[facet]) {
-                if (!aggregatedAnswer.disjunctiveFacets[facet][value] && self.disjunctiveRefinements[facet][value]) {
-                  aggregatedAnswer.disjunctiveFacets[facet][value] = 0;
+        aggregatedAnswer.disjunctiveFacets = aggregatedAnswer.disjunctiveFacets || {};
+        aggregatedAnswer.facetStats = aggregatedAnswer.facetStats || {};
+        // create disjunctive facets from facets (disjunctive facets without refinements)
+        for (var facet in unusedDisjunctiveFacets) {
+          if (aggregatedAnswer.facets[facet] && !aggregatedAnswer.disjunctiveFacets[facet]) {
+            aggregatedAnswer.disjunctiveFacets[facet] = aggregatedAnswer.facets[facet];
+            try {
+              delete aggregatedAnswer.facets[facet];
+            } catch (e) {
+              aggregatedAnswer.facets[facet] = undefined; // IE compat
+            }
+          }
+        }
+        // aggregate the disjunctive facets
+        for (i = 0; i < disjunctiveFacets.length; ++i) {
+          for (var dfacet in content.results[i + 1].facets) {
+            aggregatedAnswer.disjunctiveFacets[dfacet] = content.results[i + 1].facets[dfacet];
+            if (self.disjunctiveRefinements[dfacet]) {
+              for (var value in self.disjunctiveRefinements[dfacet]) {
+                // add the disjunctive reginements if it is no more retrieved
+                if (!aggregatedAnswer.disjunctiveFacets[dfacet][value] && self.disjunctiveRefinements[dfacet][value]) {
+                  aggregatedAnswer.disjunctiveFacets[dfacet][value] = 0;
                 }
               }
             }
           }
+          // aggregate the disjunctive facets stats
           for (var stats in content.results[i + 1].facets_stats) {
             aggregatedAnswer.facetStats[stats] = content.results[i + 1].facets_stats[stats];
           }
         }
+        // add the excludes
+        for (var exclude in self.excludes) {
+          if (self.excludes[exclude]) {
+            var e = exclude.indexOf(':-');
+            var facet = exclude.slice(0, e);
+            var value = exclude.slice(e + 2);
+            aggregatedAnswer.facets[facet] = aggregatedAnswer.facets[facet] || {};
+            if (!aggregatedAnswer.facets[facet][value]) {
+              aggregatedAnswer.facets[facet][value] = 0;
+            }
+          }
+        }
+        // call the actual callback
         if (self.extraQueries.length === 0) {
           self.searchCallback(true, aggregatedAnswer);
         } else {
+          // append the extra queries
           var c = { results: [ aggregatedAnswer ] };
-          for (var i = 0; i < self.extraQueries.length; ++i) {
-            c.results.push(content.results[1 + self.options.disjunctiveFacets.length + i]);
+          for (i = 0; i < self.extraQueries.length; ++i) {
+            c.results.push(content.results[1 + disjunctiveFacets.length + i]);
           }
           self.searchCallback(true, c);
         }
@@ -1694,10 +1937,21 @@ AlgoliaSearch.prototype.Index.prototype = {
      * @return {hash}
      */
     _getHitsSearchParams: function() {
+      var facets = [];
+      var i = 0;
+      for (i = 0; i < this.options.facets.length; ++i) {
+        facets.push(this.options.facets[i]);
+      }
+      for (i = 0; i < this.options.disjunctiveFacets.length; ++i) {
+        var facet = this.options.disjunctiveFacets[i];
+        if (!this._hasDisjunctiveRefinements(facet)) {
+          facets.push(facet);
+        }
+      }
       return extend({}, {
         hitsPerPage: this.options.hitsPerPage,
         page: this.page,
-        facets: this.options.facets,
+        facets: facets,
         facetFilters: this._getFacetFilters()
       }, this.searchParams);
     },
@@ -1720,14 +1974,36 @@ AlgoliaSearch.prototype.Index.prototype = {
     },
 
     /**
+     * Test if there are some disjunctive refinements on the facet
+     */
+    _hasDisjunctiveRefinements: function(facet) {
+      for (var value in this.disjunctiveRefinements[facet]) {
+        if (this.disjunctiveRefinements[facet][value]) {
+          return true;
+        }
+      }
+      return false;
+    },
+
+    /**
      * Build facetFilters parameter based on current refinements
      * @param  {string} facet if set, the current disjunctive facet
      * @return {hash}
      */
     _getFacetFilters: function(facet) {
       var facetFilters = [];
+      if (this.options.defaultFacetFilters) {
+        for (var i = 0; i < this.options.defaultFacetFilters.length; ++i) {
+          facetFilters.push(this.options.defaultFacetFilters[i]);
+        }
+      }
       for (var refinement in this.refinements) {
         if (this.refinements[refinement]) {
+          facetFilters.push(refinement);
+        }
+      }
+      for (var refinement in this.excludes) {
+        if (this.excludes[refinement]) {
           facetFilters.push(refinement);
         }
       }
@@ -1773,7 +2049,7 @@ AlgoliaSearch.prototype.Index.prototype = {
  */
 
 (function($) {
-
+  
   /**
    * Algolia Places API
    * @param {string} Your application ID
