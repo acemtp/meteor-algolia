@@ -1,6 +1,6 @@
 # meteor-algolia
 
-Package to handle the blazing fast Algolia search egnine (client and server).
+Package to handle the blazing fast Algolia search engine (client and server).
 
 ## Example
 
