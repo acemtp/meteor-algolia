@@ -1,0 +1,3 @@
+[submodule "algoliasearch-client-js"]
+	path = algoliasearch-client-js
+	url = https://github.com/algolia/algoliasearch-client-js.git
