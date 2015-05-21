@@ -1,1 +1,1 @@
-Algolia = Npm.require('algolia-search');
+AlgoliaSearch = Npm.require('algoliasearch');

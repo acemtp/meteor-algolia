@@ -7,10 +7,11 @@ Package.describe({
 
 Package.onUse(function(api) {
   api.versionsFrom('1.0');
+
+  api.addFiles(['algoliasearch-client-js/dist/algoliasearch.js', 'client.js'], 'client');
   api.addFiles('server.js', 'server');
-  api.addFiles('algoliasearch-client-js/dist/algoliasearch.js', 'client');
-  api.export('Algolia', 'server');
-  api.export('AlgoliaSearch', 'client');
+
+  api.export('AlgoliaSearch', ['client', 'server']);
 });
 
 Npm.depends({
