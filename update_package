@@ -1,0 +1,17 @@
+cd algoliasearch-client-js
+
+git fetch --tags
+
+CURVER=`git name-rev --tags --name-only $(git rev-parse HEAD)`
+NEWVER=`git tag | tail -2 | head -1`
+
+echo I\'ll update Algolia from $CURVER to $NEWVER
+
+echo Press enter to do it, or break the script
+read
+
+git checkout tags/$NEWVER
+
+cd ..
+
+sed -i .old -- 's/$CURVER/$NEWVER/g' package.js
