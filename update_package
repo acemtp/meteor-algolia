@@ -15,3 +15,7 @@ git checkout tags/$NEWVER
 cd ..
 
 sed -i .old -- 's/$CURVER/$NEWVER/g' package.js
+
+# git commit -a
+# git push
+# meteor publish
