@@ -29,7 +29,18 @@ Meteor package to handle the blazing fast [Algolia](http://algolia.com) search e
       else console.log('Content:', content);
     });
 
+### Meteor example app
+
+There's a working example in the `example` directory.
+
+- cd example
+- meteor
+
+You can check the [source code](https://github.com/acemtp/meteor-algolia/tree/master/example).
+
 ### Changelog
 
 - The global object is now called **AlgoliaSearch** both on client and server
 - Moved to algolia v3+ [check the migration guide](https://github.com/algolia/algoliasearch-client-js/wiki/Migration-guide-from-2.x.x-to-3.x.x)
+- Moved to algolia 3.7.8
+- Add a working client and server example (cd example; meteor)
