@@ -36,7 +36,11 @@ There's a working example in the `example` directory.
 - cd example
 - meteor
 
-You can check the [source code](https://github.com/acemtp/meteor-algolia/tree/master/example).
+Check the [source code](https://github.com/acemtp/meteor-algolia/tree/master/example).
+
+### Documentation
+
+Read the [official Algolia doc](https://www.algolia.com/doc/node#using-the-api) for the available functions and options.
 
 ### Changelog
 
