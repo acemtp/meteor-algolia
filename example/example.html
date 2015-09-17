@@ -1,0 +1,18 @@
+<head>
+  <title>Algolia Example</title>
+</head>
+
+<body>
+  <h1>Searching "ace" movies</h1>
+
+  {{> movies}}
+</body>
+
+<template name="movies">
+  <p>{{content.nbHits}} results. Here are the {{content.hitsPerPage}} first:</p>
+  <ul>
+    {{#each content.hits}}
+      <li>{{title}} {{year}}</li>
+    {{/each}}
+  </ul>
+</template>
