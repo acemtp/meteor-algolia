@@ -44,6 +44,7 @@ Read the [official Algolia doc](https://www.algolia.com/doc/node#using-the-api) 
 
 ### Changelog
 
+- Moved to algolia 3.9.1
 - The global object is now called **AlgoliaSearch** both on client and server
 - Moved to algolia v3+ [check the migration guide](https://github.com/algolia/algoliasearch-client-js/wiki/Migration-guide-from-2.x.x-to-3.x.x)
 - Moved to algolia 3.7.8

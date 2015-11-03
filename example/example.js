@@ -1,4 +1,4 @@
-// Client side Algolia example. It doesn't use/need for the server side code
+// Client side Algolia example. It doesn't use or need for the server side code.
 if (Meteor.isClient) {
   Session.setDefault('content', []);
 
@@ -9,8 +9,7 @@ if (Meteor.isClient) {
     index.search('ace', function searchDone(err, content) {
       if(err) { console.error('Algolia returned an error', err); }
       else {
-        //console.log('content', content);
-        console.log(content.nbHits + ' results. Here are the ' + content.hitsPerPage + ' first:');
+        console.log('Received ' + content.nbHits + ' results.');
         Session.set('content', content);
       }
     });
@@ -28,7 +27,7 @@ if (Meteor.isClient) {
 ////////////////////////////////////////////////////////////////////////////////////////
 ////////////////////////////////////////////////////////////////////////////////////////
 
-// Client side Algolia example. It doesn't use/need for the client side code
+// Server side Algolia example. It doesn't use or need for the client side code.
 if (Meteor.isServer) {
   Meteor.startup(function () {
     var client = AlgoliaSearch('latency', 'dce4286c2833e8cf4b7b1f2d3fa1dbcb');
